@@ -2,11 +2,11 @@
 MovieIQ.py
 MovieIQ - Predictive Analytics on Film Success
 
-Stage 5: Streamlit Dashboard
+Streamlit Dashboard
 
-Target:
+Target Variable:
     Success = 1 if Revenue > Budget
-    Success = 0 otherwise
+    Success = 0 if Revenue <= Budget
 """
 
 # ============================================================
@@ -66,20 +66,23 @@ st.markdown(
 # 4. PROJECT PATHS
 # ============================================================
 
-# When running MovieIQ.py, __file__ points to this file.
+# Location of this MovieIQ.py file
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
+# Dataset
 DATA_PATH = os.path.join(
     BASE_DIR,
     "movies.csv"
 )
 
+# Models folder
 MODELS_DIR = os.path.join(
     BASE_DIR,
     "models"
 )
 
-MODEL_PATH = os.path.join(
+# Model files
+RANDOM_FOREST_PATH = os.path.join(
     MODELS_DIR,
     "random_forest.pkl"
 )
@@ -89,7 +92,7 @@ MLB_PATH = os.path.join(
     "mlb_encoder.pkl"
 )
 
-FEATURE_PATH = os.path.join(
+FEATURE_COLUMNS_PATH = os.path.join(
     MODELS_DIR,
     "feature_columns.pkl"
 )
@@ -100,14 +103,16 @@ FEATURE_PATH = os.path.join(
 # ============================================================
 
 st.markdown(
-    "<div class='main-title'>🎬 MovieIQ - Predictive Analytics on Film Success</div>",
+    "<div class='main-title'>"
+    "🎬 MovieIQ - Predictive Analytics on Film Success"
+    "</div>",
     unsafe_allow_html=True
 )
 
 st.markdown(
     "<div class='sub-title'>"
-    "Explore movie data, financial success, statistical analysis, "
-    "and Random Forest predictions."
+    "Explore movie data, financial success, "
+    "statistical analysis, and Random Forest predictions."
     "</div>",
     unsafe_allow_html=True
 )
@@ -119,43 +124,66 @@ st.markdown(
 
 missing_files = []
 
+
+# Check movies.csv
 if not os.path.exists(DATA_PATH):
     missing_files.append("movies.csv")
 
-if not os.path.exists(MODEL_PATH):
-    missing_files.append("models/random_forest.pkl")
 
+# Check Random Forest model
+if not os.path.exists(RANDOM_FOREST_PATH):
+    missing_files.append(
+        "models/random_forest.pkl"
+    )
+
+
+# Check MultiLabelBinarizer
 if not os.path.exists(MLB_PATH):
-    missing_files.append("models/mlb_encoder.pkl")
+    missing_files.append(
+        "models/mlb_encoder.pkl"
+    )
 
-if not os.path.exists(FEATURE_PATH):
-    missing_files.append("models/feature_columns.pkl")
+
+# Check feature columns
+if not os.path.exists(FEATURE_COLUMNS_PATH):
+    missing_files.append(
+        "models/feature_columns.pkl"
+    )
 
 
+# Display missing files
 if missing_files:
 
-    st.error("❌ Required MovieIQ files are missing.")
+    st.error(
+        "❌ Required MovieIQ files are missing."
+    )
 
-    st.write("The following files could not be found:")
+    st.write(
+        "The following files could not be found:"
+    )
 
     for file_name in missing_files:
-        st.write(f"- `{file_name}`")
+        st.write(
+            f"- `{file_name}`"
+        )
 
     st.info(
-        "Make sure these files are present in the MovieIQ project folder "
-        "before starting the dashboard."
+        "Make sure your project folder contains "
+        "movies.csv and the models folder with all "
+        "three model files."
     )
 
     st.stop()
 
 
 # ============================================================
-# 7. LOAD DATA
+# 7. LOAD AND PREPROCESS DATA
 # ============================================================
 
 @st.cache_data
 def load_data():
 
+    # Load CSV
     df = pd.read_csv(DATA_PATH)
 
     # Remove duplicate records
@@ -170,13 +198,15 @@ def load_data():
     # --------------------------------------------------------
     # Target Variable
     # --------------------------------------------------------
+    # Success = 1 if Revenue > Budget
+    # Success = 0 if Revenue <= Budget
 
     df["success"] = (
         df["revenue"] > df["budget"]
     ).astype(int)
 
     # --------------------------------------------------------
-    # Parse genres
+    # Parse Genres
     # --------------------------------------------------------
 
     def parse_genres(value):
@@ -186,7 +216,9 @@ def load_data():
 
         try:
 
-            parsed = ast.literal_eval(str(value))
+            parsed = ast.literal_eval(
+                str(value)
+            )
 
             if isinstance(parsed, list):
 
@@ -197,18 +229,26 @@ def load_data():
                     and "name" in item
                 ]
 
-        except Exception:
+        except (
+            ValueError,
+            SyntaxError,
+            TypeError
+        ):
             return []
 
         return []
 
+    # Create genre list
     df["genre_list"] = df["genres"].apply(
         parse_genres
     )
 
     # Primary genre
-    df["primary_genre"] = df["genre_list"].apply(
-        lambda x: x[0] if len(x) > 0 else "Unknown"
+    df["primary_genre"] = df[
+        "genre_list"
+    ].apply(
+        lambda x:
+        x[0] if len(x) > 0 else "Unknown"
     )
 
     return df
@@ -225,15 +265,29 @@ df = load_data()
 @st.cache_resource
 def load_model():
 
-    model = joblib.load(MODEL_PATH)
+    # Load Random Forest
+    model = joblib.load(
+        RANDOM_FOREST_PATH
+    )
 
-    mlb = joblib.load(MLB_PATH)
+    # Load MultiLabelBinarizer
+    mlb = joblib.load(
+        MLB_PATH
+    )
 
-    feature_columns = joblib.load(FEATURE_PATH)
+    # Load exact feature column order
+    feature_columns = joblib.load(
+        FEATURE_COLUMNS_PATH
+    )
 
-    return model, mlb, feature_columns
+    return (
+        model,
+        mlb,
+        feature_columns
+    )
 
 
+# Load model artifacts
 rf_model, mlb, feature_columns = load_model()
 
 
@@ -241,12 +295,22 @@ rf_model, mlb, feature_columns = load_model()
 # 9. SIDEBAR FILTERS
 # ============================================================
 
-st.sidebar.header("🎬 MovieIQ Filters")
+st.sidebar.header(
+    "🎬 MovieIQ Filters"
+)
 
 
-# Genre options
+# ------------------------------------------------------------
+# Genre Filter
+# ------------------------------------------------------------
+
 genre_options = sorted(
-    df["primary_genre"].dropna().unique().tolist()
+    df[
+        "primary_genre"
+    ]
+    .dropna()
+    .unique()
+    .tolist()
 )
 
 
@@ -256,7 +320,10 @@ selected_genre = st.sidebar.selectbox(
 )
 
 
-# Vote slider
+# ------------------------------------------------------------
+# Vote Average Filter
+# ------------------------------------------------------------
+
 min_vote = float(
     df["vote_average"].min()
 )
@@ -275,7 +342,10 @@ selected_vote = st.sidebar.slider(
 )
 
 
-# Apply filters
+# ------------------------------------------------------------
+# Apply Filters
+# ------------------------------------------------------------
+
 filtered_df = df[
     df["vote_average"] >= selected_vote
 ].copy()
@@ -284,7 +354,8 @@ filtered_df = df[
 if selected_genre != "All":
 
     filtered_df = filtered_df[
-        filtered_df["primary_genre"] == selected_genre
+        filtered_df["primary_genre"]
+        == selected_genre
     ]
 
 
@@ -317,16 +388,25 @@ tab1, tab2, tab3, tab4 = st.tabs(
 
 with tab1:
 
-    st.header("📊 Dataset Summary")
+    st.header(
+        "📊 Dataset Summary"
+    )
 
-    total_movies = len(filtered_df)
+    # --------------------------------------------------------
+    # Metrics
+    # --------------------------------------------------------
+
+    total_movies = len(
+        filtered_df
+    )
 
     successful_movies = int(
         filtered_df["success"].sum()
     )
 
     failed_movies = (
-        total_movies - successful_movies
+        total_movies -
+        successful_movies
     )
 
     if total_movies > 0:
@@ -338,12 +418,8 @@ with tab1:
 
     else:
 
-        success_rate = 0
+        success_rate = 0.0
 
-
-    # --------------------------------------------------------
-    # Metrics
-    # --------------------------------------------------------
 
     col1, col2, col3, col4 = st.columns(4)
 
@@ -376,10 +452,12 @@ with tab1:
 
 
     # --------------------------------------------------------
-    # Dataset information
+    # Dataset Sample
     # --------------------------------------------------------
 
-    st.subheader("🎥 Movie Dataset")
+    st.subheader(
+        "🎥 Movie Dataset"
+    )
 
 
     display_columns = [
@@ -410,21 +488,23 @@ with tab1:
 
 
     # --------------------------------------------------------
-    # Success definition
+    # Success Definition
     # --------------------------------------------------------
 
     st.markdown("---")
 
-    st.subheader("🎯 Success Definition")
-
-    st.write(
-        "A movie is classified as **Successful (1)** "
-        "when its revenue is greater than its budget."
+    st.subheader(
+        "🎯 Success Definition"
     )
 
     st.write(
-        "A movie is classified as **Failure (0)** "
-        "when its revenue is less than or equal to its budget."
+        "A movie is classified as "
+        "**Successful (1)** when Revenue > Budget."
+    )
+
+    st.write(
+        "A movie is classified as "
+        "**Failure (0)** when Revenue <= Budget."
     )
 
 
@@ -434,7 +514,9 @@ with tab1:
 
 with tab2:
 
-    st.header("📈 Exploratory Data Analysis")
+    st.header(
+        "📈 Exploratory Data Analysis"
+    )
 
 
     if len(filtered_df) == 0:
@@ -446,7 +528,7 @@ with tab2:
     else:
 
         # ====================================================
-        # CHART 1
+        # CHART 1 - BUDGET VS REVENUE
         # ====================================================
 
         chart_col1, chart_col2 = st.columns(2)
@@ -455,33 +537,44 @@ with tab2:
         with chart_col1:
 
             st.subheader(
-                "Budget vs Revenue"
+                "💰 Budget vs Revenue"
             )
+
 
             fig, ax = plt.subplots(
                 figsize=(7, 5)
             )
 
 
-            colors = filtered_df[
-                "success"
-            ].map(
-                {
-                    1: "#2ecc71",
-                    0: "#e74c3c"
-                }
+            # Success/failure markers
+            success_data = filtered_df[
+                filtered_df["success"] == 1
+            ]
+
+            failure_data = filtered_df[
+                filtered_df["success"] == 0
+            ]
+
+
+            ax.scatter(
+                failure_data["budget"],
+                failure_data["revenue"],
+                alpha=0.5,
+                s=25,
+                label="Failure"
             )
 
 
             ax.scatter(
-                filtered_df["budget"],
-                filtered_df["revenue"],
-                c=colors,
+                success_data["budget"],
+                success_data["revenue"],
                 alpha=0.5,
-                s=25
+                s=25,
+                label="Success"
             )
 
 
+            # Break-even line
             max_value = max(
                 filtered_df["budget"].max(),
                 filtered_df["revenue"].max()
@@ -492,7 +585,8 @@ with tab2:
                 [0, max_value],
                 [0, max_value],
                 "k--",
-                linewidth=1
+                linewidth=1,
+                label="Break-even"
             )
 
 
@@ -508,6 +602,8 @@ with tab2:
                 "Budget vs Revenue"
             )
 
+            ax.legend()
+
 
             st.pyplot(fig)
 
@@ -515,19 +611,21 @@ with tab2:
 
 
         # ====================================================
-        # CHART 2
+        # CHART 2 - SUCCESS RATE BY GENRE
         # ====================================================
 
         with chart_col2:
 
             st.subheader(
-                "Success Rate by Genre"
+                "🎭 Success Rate by Genre"
             )
 
 
             genre_rate = (
                 filtered_df
-                .groupby("primary_genre")["success"]
+                .groupby(
+                    "primary_genre"
+                )["success"]
                 .mean()
                 .sort_values(
                     ascending=False
@@ -556,6 +654,10 @@ with tab2:
                 "Primary Genre"
             )
 
+            ax.set_title(
+                "Movie Success Rate by Genre"
+            )
+
 
             st.pyplot(fig)
 
@@ -566,7 +668,7 @@ with tab2:
 
 
         # ====================================================
-        # CHART 3
+        # CHART 3 - VOTE AVERAGE VS SUCCESS
         # ====================================================
 
         chart_col3, chart_col4 = st.columns(2)
@@ -575,7 +677,7 @@ with tab2:
         with chart_col3:
 
             st.subheader(
-                "Vote Average vs Success"
+                "⭐ Vote Average vs Success"
             )
 
 
@@ -613,19 +715,24 @@ with tab2:
             )
 
 
+            ax.set_title(
+                "Vote Average by Movie Result"
+            )
+
+
             st.pyplot(fig)
 
             plt.close(fig)
 
 
         # ====================================================
-        # CHART 4
+        # CHART 4 - CORRELATION HEATMAP
         # ====================================================
 
         with chart_col4:
 
             st.subheader(
-                "Correlation Heatmap"
+                "🔥 Correlation Heatmap"
             )
 
 
@@ -646,14 +753,16 @@ with tab2:
             ]
 
 
-            fig, ax = plt.subplots(
-                figsize=(7, 5)
+            correlation = (
+                filtered_df[
+                    available_numeric
+                ].corr()
             )
 
 
-            correlation = filtered_df[
-                available_numeric
-            ].corr()
+            fig, ax = plt.subplots(
+                figsize=(7, 5)
+            )
 
 
             sns.heatmap(
@@ -663,6 +772,11 @@ with tab2:
                 cmap="coolwarm",
                 center=0,
                 ax=ax
+            )
+
+
+            ax.set_title(
+                "Feature Correlation"
             )
 
 
@@ -690,20 +804,27 @@ with tab3:
         "1. Independent T-Test"
     )
 
+
     st.write(
         "Testing whether popularity differs between "
         "successful and unsuccessful movies."
     )
 
 
-    successful_popularity = filtered_df[
-        filtered_df["success"] == 1
-    ]["popularity"].dropna()
+    successful_popularity = (
+        filtered_df[
+            filtered_df["success"] == 1
+        ]["popularity"]
+        .dropna()
+    )
 
 
-    failed_popularity = filtered_df[
-        filtered_df["success"] == 0
-    ]["popularity"].dropna()
+    failed_popularity = (
+        filtered_df[
+            filtered_df["success"] == 0
+        ]["popularity"]
+        .dropna()
+    )
 
 
     if (
@@ -775,7 +896,7 @@ with tab3:
 
 
     # ========================================================
-    # CHI-SQUARE
+    # CHI-SQUARE TEST
     # ========================================================
 
     st.subheader(
@@ -801,20 +922,25 @@ with tab3:
         contingency_table.shape[1] > 1
     ):
 
-        chi2_stat, chi2_pvalue, degrees_of_freedom, expected = (
-            stats.chi2_contingency(
-                contingency_table
-            )
+        (
+            chi2_stat,
+            chi2_pvalue,
+            degrees_of_freedom,
+            expected
+        ) = stats.chi2_contingency(
+            contingency_table
         )
 
 
         st.write(
-            "**H₀:** Genre and movie success are independent."
+            "**H₀:** Genre and movie success "
+            "are independent."
         )
 
 
         st.write(
-            "**H₁:** Genre and movie success are associated."
+            "**H₁:** Genre and movie success "
+            "are associated."
         )
 
 
@@ -898,6 +1024,10 @@ with tab4:
     col1, col2 = st.columns(2)
 
 
+    # --------------------------------------------------------
+    # LEFT COLUMN
+    # --------------------------------------------------------
+
     with col1:
 
         input_budget = st.number_input(
@@ -924,6 +1054,10 @@ with tab4:
         )
 
 
+    # --------------------------------------------------------
+    # RIGHT COLUMN
+    # --------------------------------------------------------
+
     with col2:
 
         input_vote = st.slider(
@@ -935,7 +1069,7 @@ with tab4:
         )
 
 
-        # Genre list comes from the trained ML encoder
+        # Get genres from trained ML encoder
         genre_options_prediction = sorted(
             [
                 str(g)
@@ -944,15 +1078,29 @@ with tab4:
         )
 
 
+        # Default genres
+        default_genres = []
+
+
+        if "Action" in genre_options_prediction:
+            default_genres.append("Action")
+
+
+        if "Drama" in genre_options_prediction:
+            default_genres.append("Drama")
+
+
+        if len(default_genres) == 0:
+
+            default_genres = (
+                genre_options_prediction[:2]
+            )
+
+
         input_genres = st.multiselect(
             "Select Genre(s)",
             options=genre_options_prediction,
-            default=(
-                ["Action", "Drama"]
-                if "Action" in genre_options_prediction
-                and "Drama" in genre_options_prediction
-                else genre_options_prediction[:2]
-            )
+            default=default_genres
         )
 
 
@@ -971,7 +1119,7 @@ with tab4:
         try:
 
             # ------------------------------------------------
-            # Create empty input row
+            # Create empty feature dictionary
             # ------------------------------------------------
 
             input_dict = {
@@ -981,31 +1129,44 @@ with tab4:
 
 
             # ------------------------------------------------
-            # Numerical features
+            # Numerical Features
             # ------------------------------------------------
 
             if "budget" in input_dict:
-                input_dict["budget"] = input_budget
+
+                input_dict["budget"] = (
+                    input_budget
+                )
 
 
             if "popularity" in input_dict:
-                input_dict["popularity"] = input_popularity
+
+                input_dict["popularity"] = (
+                    input_popularity
+                )
 
 
             if "runtime" in input_dict:
-                input_dict["runtime"] = input_runtime
+
+                input_dict["runtime"] = (
+                    input_runtime
+                )
 
 
             if "vote_average" in input_dict:
-                input_dict["vote_average"] = input_vote
+
+                input_dict["vote_average"] = (
+                    input_vote
+                )
 
 
             # ------------------------------------------------
-            # Genre features
+            # Genre Features
             #
             # IMPORTANT:
-            # Your training script saved genre columns
+            # The training script saved genre columns
             # using mlb.classes_ directly.
+            # Therefore we use the genre name itself.
             # ------------------------------------------------
 
             for genre in input_genres:
@@ -1024,14 +1185,14 @@ with tab4:
             )
 
 
-            # Ensure EXACT feature order
+            # Ensure exact feature order
             input_df = input_df[
                 feature_columns
             ]
 
 
             # ------------------------------------------------
-            # Prediction
+            # Model Prediction
             # ------------------------------------------------
 
             prediction = rf_model.predict(
@@ -1046,14 +1207,48 @@ with tab4:
             )
 
 
-            success_probability = (
-                probabilities[1] * 100
+            # ------------------------------------------------
+            # Probability
+            # ------------------------------------------------
+
+            # Find class positions safely
+            class_list = list(
+                rf_model.classes_
             )
 
 
-            failure_probability = (
-                probabilities[0] * 100
-            )
+            if 1 in class_list:
+
+                success_index = (
+                    class_list.index(1)
+                )
+
+                success_probability = (
+                    probabilities[
+                        success_index
+                    ] * 100
+                )
+
+            else:
+
+                success_probability = 0.0
+
+
+            if 0 in class_list:
+
+                failure_index = (
+                    class_list.index(0)
+                )
+
+                failure_probability = (
+                    probabilities[
+                        failure_index
+                    ] * 100
+                )
+
+            else:
+
+                failure_probability = 0.0
 
 
             confidence = max(
@@ -1063,7 +1258,7 @@ with tab4:
 
 
             # ------------------------------------------------
-            # Display result
+            # Display Prediction
             # ------------------------------------------------
 
             st.markdown("---")
@@ -1072,11 +1267,14 @@ with tab4:
             if prediction == 1:
 
                 st.success(
-                    "🎉 PREDICTION: FINANCIAL SUCCESS"
+                    "🎉 PREDICTION: "
+                    "FINANCIAL SUCCESS"
                 )
 
 
-                result_col1, result_col2 = st.columns(2)
+                result_col1, result_col2 = (
+                    st.columns(2)
+                )
 
 
                 result_col1.metric(
@@ -1091,14 +1289,23 @@ with tab4:
                 )
 
 
-            else:
-
-                st.error(
-                    "⚠️ PREDICTION: FINANCIAL FAILURE"
+                st.write(
+                    "The model predicts that "
+                    "Revenue is likely to exceed Budget."
                 )
 
 
-                result_col1, result_col2 = st.columns(2)
+            else:
+
+                st.error(
+                    "⚠️ PREDICTION: "
+                    "FINANCIAL FAILURE / HIGH RISK"
+                )
+
+
+                result_col1, result_col2 = (
+                    st.columns(2)
+                )
 
 
                 result_col1.metric(
@@ -1113,12 +1320,19 @@ with tab4:
                 )
 
 
+                st.write(
+                    "The model predicts that "
+                    "Revenue is likely to be less than "
+                    "or equal to Budget."
+                )
+
+
             # ------------------------------------------------
-            # Probability bar
+            # Probability Chart
             # ------------------------------------------------
 
             st.subheader(
-                "Prediction Probability"
+                "📊 Prediction Probability"
             )
 
 
@@ -1156,7 +1370,6 @@ with tab4:
                 "❌ Prediction could not be completed."
             )
 
-
             st.exception(error)
 
 
@@ -1170,4 +1383,3 @@ st.caption(
     "🎬 MovieIQ | Predictive Analytics on Film Success | "
     "Python • Pandas • Scikit-learn • Random Forest • Streamlit"
 )
-!streamlit run MovieIQ.py
