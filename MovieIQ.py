@@ -1170,3 +1170,4 @@ st.caption(
     "🎬 MovieIQ | Predictive Analytics on Film Success | "
     "Python • Pandas • Scikit-learn • Random Forest • Streamlit"
 )
+streamlit run MovieIQ.py
